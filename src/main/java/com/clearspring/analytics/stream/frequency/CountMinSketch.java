@@ -20,10 +20,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import java.util.Arrays;
-import java.util.Random;
-
+import com.clearspring.analytics.hash.MurmurHash;
 import com.clearspring.analytics.stream.membership.Filter;
+
+import java.util.HashMap;
+import java.util.Random;
+import java.util.Map;
+import java.util.Arrays;
+
 
 /**
  * Count-Min Sketch datastructure.
@@ -38,6 +42,8 @@ public class CountMinSketch implements IFrequency {
     int width;
     long[][] table;
     long[] hashA;
+    Map<Object,Long> topK;
+    double phi;
     long size;
     double eps;
     double confidence;
@@ -61,6 +67,18 @@ public class CountMinSketch implements IFrequency {
         this.width = (int) Math.ceil(2 / epsOfTotalCount);
         this.depth = (int) Math.ceil(-Math.log(1 - confidence) / Math.log(2));
         initTablesWith(depth, width, seed);
+    }
+
+    public CountMinSketch(double epsOfTotalCount, double confidence, double phi, int seed) {
+        // 2/w = eps ; w = 2/eps
+        // 1/2^depth <= 1-confidence ; depth >= -log2 (1-confidence)
+        this.eps = epsOfTotalCount;
+        this.confidence = confidence;
+        this.width = (int) Math.ceil(2 / epsOfTotalCount);
+        this.depth = (int) Math.ceil(-Math.log(1 - confidence) / Math.log(2));
+        initTablesWith(depth, width, seed);
+        this.phi = phi;
+        topK = new HashMap<Object,Long>();
     }
 
     CountMinSketch(int depth, int width, int size, long[] hashA, long[][] table) {
@@ -139,6 +157,31 @@ public class CountMinSketch implements IFrequency {
     }
 
     @Override
+    public void add(Object object, long count) {
+        if (count < 0) {
+            throw new IllegalArgumentException("Negative increments not implemented");
+        }
+        final int hashedObject = MurmurHash.hash(object);
+        for (int i = 0; i < depth; ++i) {
+            table[i][hash(hashedObject, i)] += count;
+        }
+        size += count;
+    }
+
+    private void updateTopK(Object object){
+        int minFrequency = (int)Math.ceil(size*phi);
+        long estimateCount = estimateCount(object);
+        if (estimateCount >= minFrequency){
+            topK.put(object,estimateCount);
+        }
+        for(Object o:topK.keySet()){
+            if(topK.get(o)<minFrequency){
+                topK.remove(o);
+            }
+        }
+    }
+
+    @Override
     public long size() {
         return size;
     }
@@ -162,6 +205,16 @@ public class CountMinSketch implements IFrequency {
         int[] buckets = Filter.getHashBuckets(item, depth, width);
         for (int i = 0; i < depth; ++i) {
             res = Math.min(res, table[i][buckets[i]]);
+        }
+        return res;
+    }
+
+    @Override
+    public long estimateCount(Object object) {
+        long res = Long.MAX_VALUE;
+        final int hashedObject = MurmurHash.hash(object);
+        for (int i = 0; i < depth; ++i) {
+            res = Math.min(res, table[i][hash(hashedObject, i)]);
         }
         return res;
     }
@@ -259,5 +312,9 @@ public class CountMinSketch implements IFrequency {
         public CMSMergeException(String message) {
             super(message);
         }
+    }
+
+    public Map<Object,Long> getTopK(){
+        return topK;
     }
 }
