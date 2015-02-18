@@ -23,10 +23,7 @@ import java.io.IOException;
 import com.clearspring.analytics.hash.MurmurHash;
 import com.clearspring.analytics.stream.membership.Filter;
 
-import java.util.HashMap;
-import java.util.Random;
-import java.util.Map;
-import java.util.Arrays;
+import java.util.*;
 
 
 /**
@@ -138,6 +135,7 @@ public class CountMinSketch implements IFrequency {
             table[i][hash(item, i)] += count;
         }
         size += count;
+        updateTopK(item);
     }
 
     @Override
@@ -154,29 +152,31 @@ public class CountMinSketch implements IFrequency {
             table[i][buckets[i]] += count;
         }
         size += count;
+        updateTopK(item);
     }
 
-    @Override
-    public void add(Object object, long count) {
-        if (count < 0) {
-            throw new IllegalArgumentException("Negative increments not implemented");
-        }
-        final int hashedObject = MurmurHash.hash(object);
-        for (int i = 0; i < depth; ++i) {
-            table[i][hash(hashedObject, i)] += count;
-        }
-        size += count;
-    }
-
-    private void updateTopK(Object object){
+    private void updateTopK(long item){
         int minFrequency = (int)Math.ceil(size*phi);
-        long estimateCount = estimateCount(object);
+        long estimateCount = estimateCount(item);
         if (estimateCount >= minFrequency){
-            topK.put(object,estimateCount);
+            topK.put(item,estimateCount);
         }
-        for(Object o:topK.keySet()){
-            if(topK.get(o)<minFrequency){
-                topK.remove(o);
+        for (Map.Entry<Object, Long> entry : topK.entrySet()){
+            if(entry.getValue()<minFrequency){
+                topK.remove(entry);
+            }
+        }
+    }
+
+    private void updateTopK(String item){
+        int minFrequency = (int)Math.ceil(size*phi);
+        long estimateCount = estimateCount(item);
+        if (estimateCount >= minFrequency){
+            topK.put(item,estimateCount);
+        }
+        for (Map.Entry<Object, Long> entry : topK.entrySet()){
+            if(entry.getValue()<minFrequency){
+                topK.remove(entry);
             }
         }
     }
@@ -205,16 +205,6 @@ public class CountMinSketch implements IFrequency {
         int[] buckets = Filter.getHashBuckets(item, depth, width);
         for (int i = 0; i < depth; ++i) {
             res = Math.min(res, table[i][buckets[i]]);
-        }
-        return res;
-    }
-
-    @Override
-    public long estimateCount(Object object) {
-        long res = Long.MAX_VALUE;
-        final int hashedObject = MurmurHash.hash(object);
-        for (int i = 0; i < depth; ++i) {
-            res = Math.min(res, table[i][hash(hashedObject, i)]);
         }
         return res;
     }
