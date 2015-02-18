@@ -20,7 +20,6 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import com.clearspring.analytics.hash.MurmurHash;
 import com.clearspring.analytics.stream.membership.Filter;
 
 import java.util.*;
@@ -39,8 +38,6 @@ public class CountMinSketch implements IFrequency {
     int width;
     long[][] table;
     long[] hashA;
-    Map<Object,Long> topK;
-    double phi;
     long size;
     double eps;
     double confidence;
@@ -64,18 +61,6 @@ public class CountMinSketch implements IFrequency {
         this.width = (int) Math.ceil(2 / epsOfTotalCount);
         this.depth = (int) Math.ceil(-Math.log(1 - confidence) / Math.log(2));
         initTablesWith(depth, width, seed);
-    }
-
-    public CountMinSketch(double epsOfTotalCount, double confidence, double phi, int seed) {
-        // 2/w = eps ; w = 2/eps
-        // 1/2^depth <= 1-confidence ; depth >= -log2 (1-confidence)
-        this.eps = epsOfTotalCount;
-        this.confidence = confidence;
-        this.width = (int) Math.ceil(2 / epsOfTotalCount);
-        this.depth = (int) Math.ceil(-Math.log(1 - confidence) / Math.log(2));
-        initTablesWith(depth, width, seed);
-        this.phi = phi;
-        topK = new HashMap<Object,Long>();
     }
 
     CountMinSketch(int depth, int width, int size, long[] hashA, long[][] table) {
@@ -135,7 +120,6 @@ public class CountMinSketch implements IFrequency {
             table[i][hash(item, i)] += count;
         }
         size += count;
-        updateTopK(item);
     }
 
     @Override
@@ -152,33 +136,6 @@ public class CountMinSketch implements IFrequency {
             table[i][buckets[i]] += count;
         }
         size += count;
-        updateTopK(item);
-    }
-
-    private void updateTopK(long item){
-        int minFrequency = (int)Math.ceil(size*phi);
-        long estimateCount = estimateCount(item);
-        if (estimateCount >= minFrequency){
-            topK.put(item,estimateCount);
-        }
-        for (Map.Entry<Object, Long> entry : topK.entrySet()){
-            if(entry.getValue()<minFrequency){
-                topK.remove(entry);
-            }
-        }
-    }
-
-    private void updateTopK(String item){
-        int minFrequency = (int)Math.ceil(size*phi);
-        long estimateCount = estimateCount(item);
-        if (estimateCount >= minFrequency){
-            topK.put(item,estimateCount);
-        }
-        for (Map.Entry<Object, Long> entry : topK.entrySet()){
-            if(entry.getValue()<minFrequency){
-                topK.remove(entry);
-            }
-        }
     }
 
     @Override
@@ -304,7 +261,4 @@ public class CountMinSketch implements IFrequency {
         }
     }
 
-    public Map<Object,Long> getTopK(){
-        return topK;
-    }
 }
