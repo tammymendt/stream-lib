@@ -1,5 +1,6 @@
 package com.clearspring.analytics.stream.frequency;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -11,15 +12,18 @@ public class CountMinTopK extends CountMinSketch{
 
     Map<Object,Long> topK;
     double phi;
+    long size;
 
     public CountMinTopK(int depth, int width, int seed, double phi){
         super(depth, width, seed);
+        this.size = 0;
         this.phi = phi;
         this.topK = new HashMap<Object,Long>();
     }
 
     public CountMinTopK(double epsOfTotalCount, double confidence, int seed, double phi){
         super(epsOfTotalCount,confidence,seed);
+        this.size = 0;
         this.phi = phi;
         this.topK = new HashMap<Object,Long>();
     }
@@ -53,12 +57,14 @@ public class CountMinTopK extends CountMinSketch{
     @Override
     public void add(long item, long count) {
         super.add(item,count);
+        size+=count;
         updateTopK(item);
     }
 
     @Override
     public void add(String item, long count) {
         super.add(item,count);
+        size+=count;
         updateTopK(item);
     }
 
@@ -81,10 +87,14 @@ public class CountMinTopK extends CountMinSketch{
     }
 
     private void removeNonFrequent(long minFrequency){
+        ArrayList<Object> nonFrequentKeys = new ArrayList<Object>();
         for (Map.Entry<Object, Long> entry : topK.entrySet()){
             if(entry.getValue()<minFrequency){
-                topK.remove(entry);
+                nonFrequentKeys.add(entry.getKey());
             }
+        }
+        for (Object o:nonFrequentKeys){
+            topK.remove(o);
         }
     }
 
@@ -101,9 +111,7 @@ public class CountMinTopK extends CountMinSketch{
                 }
                 for (Map.Entry<Object, Long> entry : estimator.topK.entrySet()) {
                     if (topK.containsKey(entry.getKey())){
-                        topK.replace(entry.getKey(),mergedSketch.estimateCount((long)entry.getKey()));
-                        //long oldValue = topK.get(entry.getKey());
-                        //topK.replace(entry.getKey(),oldValue+entry.getValue());
+                        topK.put(entry.getKey(),mergedSketch.estimateCount((long)entry.getKey()));
                     }else{
                         topK.put(entry.getKey(),entry.getValue());
                     }

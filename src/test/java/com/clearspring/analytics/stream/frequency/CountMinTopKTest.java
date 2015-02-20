@@ -24,13 +24,16 @@ public class CountMinTopKTest {
         int[] xs = new int[numItems];
         int maxScale = 20;
 
-        for (int i = 0; i < numItems/2; i++) {
-            xs[i] = 1;
-        }
-
-        for (int i = 0; i < numItems/2; i++) {
-            int scale = r.nextInt(maxScale);
-            xs[numItems/2 + i] = r.nextInt(1 << scale);
+        for (int i = 0; i < numItems; i++) {
+            double p = r.nextDouble();
+            if (p<0.2){
+                xs[i] = 1;
+            }else if (p<0.4) {
+                xs[i] = 12;
+            }else {
+                int scale = r.nextInt(maxScale);
+                xs[i] = r.nextInt(1 << scale);
+            }
         }
 
         double epsOfTotalCount = 0.0001;
@@ -46,16 +49,11 @@ public class CountMinTopKTest {
             actualFreq[x]++;
         }
 
-        System.out.println("Printing the content of TopK Map");
-        for (Map.Entry<Object,Long> entry : sketch.topK.entrySet()){
-            System.out.println(entry.getKey()+" ("+entry.getKey().getClass()+"): "+entry.getValue()+"\n");
-        }
-
         for (int i = 0; i < actualFreq.length; ++i) {
             if (actualFreq[i]>=frequency){
-                assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], sketch.topK.containsKey(i));
+                assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], sketch.topK.containsKey((long)i));
             }else{
-                assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !sketch.topK.containsKey(i));
+                assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !sketch.topK.containsKey((long)i));
             }
         }
     }
@@ -79,26 +77,27 @@ public class CountMinTopKTest {
         for (int i = 0; i < numToMerge; i++) {
             sketches[i] = new CountMinTopK(epsOfTotalCount, confidence, seed, phi);
             for (int j = 0; j < cardinality; j++) {
-                if (r.nextDouble()<0.2){
-                    sketches[i].add(1, 1);
-                    baseline.add(1, 1);
-                    sketches[i].add(50, 1);
-                    baseline.add(50, 1);
+                double p = r.nextDouble();
+                if (p<0.2){
+                    sketches[i].add(1*i+1, 1);
+                    baseline.add(1*i+1, 1);
+                }else if (p<0.4) {
+                    sketches[i].add(50*i+1, 1);
+                    baseline.add(50*i+1, 1);
+                }else {
+                    int scale = r.nextInt(maxScale);
+                    int val = r.nextInt(1 << scale);
+                    sketches[i].add(val, 1);
+                    baseline.add(val, 1);
                 }
-                int scale = r.nextInt(maxScale);
-                int val = r.nextInt(1 << scale);
-                sketches[i].add(val, 1);
-                baseline.add(val, 1);
             }
         }
 
         CountMinTopK merged = CountMinTopK.merge(sketches);
 
         for (Map.Entry<Object, Long> entry : baseline.topK.entrySet()){
-            System.out.println("\nFrequent in Baseline: "+entry.getKey()+": "+entry.getValue());
             assertTrue("Frequent item in baseline is not frequent in merged: " + entry.getKey(), merged.topK.containsKey(entry.getKey()));
-            System.out.println("\nFrequent Detected: "+entry.getKey()+": "+ merged.topK.get(entry.getKey()));
-            //assertEquals(entry.getValue(), merged.topK.get(entry.getKey()));
+            assertEquals(entry.getValue(), merged.topK.get(entry.getKey()));
         }
     }
 
