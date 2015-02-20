@@ -1,5 +1,6 @@
 package com.clearspring.analytics.stream.frequency;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,6 +30,26 @@ public class CountMinTopK extends CountMinSketch{
         this.topK = new HashMap<Object,Long>();
     }
 
+    public CountMinTopK(CountMinSketch countMinSketch, double phi){
+
+        this.depth = countMinSketch.depth;
+        this.width = countMinSketch.width;
+        this.eps = countMinSketch.eps;
+        this.confidence = countMinSketch.confidence;
+        this.size = countMinSketch.size;
+        this.hashA = Arrays.copyOf(countMinSketch.hashA, countMinSketch.hashA.length);
+
+        this.table = new long[depth][width];
+        for (int i = 0; i < countMinSketch.table.length; i++) {
+            for (int j = 0; j < countMinSketch.table[i].length; j++) {
+                this.table[i][j] += countMinSketch.table[i][j];
+            }
+        }
+
+        this.phi = phi;
+        this.topK = new HashMap<Object,Long>();
+    }
+
     @Override
     public void add(long item, long count) {
         super.add(item,count);
@@ -42,24 +63,24 @@ public class CountMinTopK extends CountMinSketch{
     }
 
     private void updateTopK(long item){
-        int minFrequency = (int)Math.ceil(size*phi);
+        long minFrequency = (long)Math.ceil(size*phi);
         long estimateCount = estimateCount(item);
         if (estimateCount >= minFrequency){
             topK.put(item,estimateCount);
         }
-        for (Map.Entry<Object, Long> entry : topK.entrySet()){
-            if(entry.getValue()<minFrequency){
-                topK.remove(entry);
-            }
-        }
+        removeNonFrequent(minFrequency);
     }
 
     private void updateTopK(String item){
-        int minFrequency = (int)Math.ceil(size*phi);
+        long minFrequency = (long)Math.ceil(size*phi);
         long estimateCount = estimateCount(item);
         if (estimateCount >= minFrequency){
             topK.put(item,estimateCount);
         }
+        removeNonFrequent(minFrequency);
+    }
+
+    private void removeNonFrequent(long minFrequency){
         for (Map.Entry<Object, Long> entry : topK.entrySet()){
             if(entry.getValue()<minFrequency){
                 topK.remove(entry);
@@ -67,7 +88,31 @@ public class CountMinTopK extends CountMinSketch{
         }
     }
 
-    public Map<Object,Long> getTopK(){
-        return topK;
+    public static CountMinTopK merge(CountMinTopK... estimators) throws CMSMergeException {
+        CountMinSketch mergedSketch = (CountMinSketch) CountMinSketch.merge(estimators);
+        double phi = estimators[0].phi;
+        Map<Object,Long> topK = new HashMap<Object,Long>();
+        CountMinTopK merged = new CountMinTopK(mergedSketch,phi);
+
+        if (estimators != null && estimators.length > 0) {
+            for (CountMinTopK estimator : estimators) {
+                if (estimator.phi != phi) {
+                    throw new CMSMergeException("Cannot merge estimators of frequency expectation");
+                }
+                for (Map.Entry<Object, Long> entry : estimator.topK.entrySet()) {
+                    if (topK.containsKey(entry.getKey())){
+                        topK.replace(entry.getKey(),mergedSketch.estimateCount((long)entry.getKey()));
+                        //long oldValue = topK.get(entry.getKey());
+                        //topK.replace(entry.getKey(),oldValue+entry.getValue());
+                    }else{
+                        topK.put(entry.getKey(),entry.getValue());
+                    }
+                }
+            }
+        }
+        long minFrequency = (long) Math.ceil(merged.size * estimators[0].phi);
+        merged.topK = new HashMap<Object,Long>(topK);
+        merged.removeNonFrequent(minFrequency);
+        return merged;
     }
 }
