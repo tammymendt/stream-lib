@@ -66,6 +66,7 @@ public class CountMinTopKTest {
         int cardinality = 1000000;
 
         double epsOfTotalCount = 0.0001;
+
         double confidence = 0.99;
         int seed = 7364181;
         double phi = 0.2;
