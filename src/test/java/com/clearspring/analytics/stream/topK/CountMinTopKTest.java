@@ -41,9 +41,11 @@ public class CountMinTopKTest {
         double epsOfTotalCount = 0.0001;
         double confidence = 0.99;
 
-        CountMinTopK sketch = new CountMinTopK(epsOfTotalCount, confidence, seed, phi);
+        CountMinSketch sketch = new CountMinSketch(epsOfTotalCount, confidence, seed);
+        CountMinTopK cmTopK = new CountMinTopK(sketch,phi);
+
         for (int x : xs) {
-            sketch.add(x, 1);
+            cmTopK.addLong(x, 1);
         }
 
         long[] actualFreq = new long[1 << maxScale];
@@ -53,15 +55,15 @@ public class CountMinTopKTest {
 
         for (int i = 0; i < actualFreq.length; ++i) {
             if (actualFreq[i]>=frequency){
-                assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], sketch.topK.containsKey((long)i));
+                assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], cmTopK.topK.containsKey((long)i));
             }else{
-                assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !sketch.topK.containsKey((long)i));
+                assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !cmTopK.topK.containsKey((long)i));
             }
         }
     }
 
     @Test
-    public void merge() throws CountMinSketch.CMSMergeException {
+    public void merge() throws CountMinTopK.CMTopKMergeException {
         int numToMerge = 5;
         int cardinality = 1000000;
 
@@ -74,23 +76,26 @@ public class CountMinTopKTest {
         int maxScale = 20;
         Random r = new Random();
 
-        CountMinTopK baseline = new CountMinTopK(epsOfTotalCount, confidence, seed, phi);
+        CountMinSketch sketchBaseline = new CountMinSketch(epsOfTotalCount, confidence, seed);
+        CountMinTopK baseline = new CountMinTopK(sketchBaseline,phi);
+
         CountMinTopK[] sketches = new CountMinTopK[numToMerge];
         for (int i = 0; i < numToMerge; i++) {
-            sketches[i] = new CountMinTopK(epsOfTotalCount, confidence, seed, phi);
+            CountMinSketch cms = new CountMinSketch(epsOfTotalCount, confidence, seed);
+            sketches[i] = new CountMinTopK(cms, phi);
             for (int j = 0; j < cardinality; j++) {
                 double p = r.nextDouble();
                 if (p<0.2){
-                    sketches[i].add(1*i+1, 1);
-                    baseline.add(1*i+1, 1);
+                    sketches[i].addLong(1 * i + 1, 1);
+                    baseline.addLong(1 * i + 1, 1);
                 }else if (p<0.4) {
-                    sketches[i].add(50*i+1, 1);
-                    baseline.add(50*i+1, 1);
+                    sketches[i].addLong(50 * i + 1, 1);
+                    baseline.addLong(50 * i + 1, 1);
                 }else {
                     int scale = r.nextInt(maxScale);
                     int val = r.nextInt(1 << scale);
-                    sketches[i].add(val, 1);
-                    baseline.add(val, 1);
+                    sketches[i].addLong(val, 1);
+                    baseline.addLong(val, 1);
                 }
             }
         }
