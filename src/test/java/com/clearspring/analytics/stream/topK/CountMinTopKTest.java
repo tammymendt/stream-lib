@@ -1,5 +1,7 @@
-package com.clearspring.analytics.stream.frequency;
+package com.clearspring.analytics.stream.topK;
 
+import com.clearspring.analytics.stream.frequency.CountMinSketch;
+import com.clearspring.analytics.stream.topK.CountMinTopK;
 import org.junit.Test;
 
 import java.util.Map;

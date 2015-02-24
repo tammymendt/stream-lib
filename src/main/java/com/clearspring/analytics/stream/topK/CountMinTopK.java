@@ -1,5 +1,6 @@
 package com.clearspring.analytics.stream.topK;
 
+import com.clearspring.analytics.hash.MurmurHash;
 import com.clearspring.analytics.stream.frequency.CountMinSketch;
 
 import java.util.ArrayList;
@@ -10,69 +11,43 @@ import java.util.Map;
 /**
  * Created by Tamara on 2/18/2015.
  */
-public class CountMinTopK extends CountMinSketch {
+public class CountMinTopK implements TopK {
 
-    Map<Object,Long> topK;
+    CountMinSketch countMinSketch;
+    HashMap<Object,Long> topK;
     double phi;
     long size;
 
-    public CountMinTopK(int depth, int width, int seed, double phi){
-        super(depth, width, seed);
-        this.size = 0;
-        this.phi = phi;
-        this.topK = new HashMap<Object,Long>();
-    }
-
-    public CountMinTopK(double epsOfTotalCount, double confidence, int seed, double phi){
-        super(epsOfTotalCount,confidence,seed);
-        this.size = 0;
-        this.phi = phi;
-        this.topK = new HashMap<Object,Long>();
-    }
-
-    public CountMinTopK(int depth, int width, int size, long[] hashA, long[][] table, double phi){
-        super(depth,width,size,hashA,table);
-        this.phi = phi;
-        this.topK = new HashMap<Object,Long>();
-    }
-
     public CountMinTopK(CountMinSketch countMinSketch, double phi){
-
-        this.depth = countMinSketch.depth;
-        this.width = countMinSketch.width;
-        this.eps = countMinSketch.eps;
-        this.confidence = countMinSketch.confidence;
-        this.size = countMinSketch.size;
-        this.hashA = Arrays.copyOf(countMinSketch.hashA, countMinSketch.hashA.length);
-
-        this.table = new long[depth][width];
-        for (int i = 0; i < countMinSketch.table.length; i++) {
-            for (int j = 0; j < countMinSketch.table[i].length; j++) {
-                this.table[i][j] += countMinSketch.table[i][j];
-            }
-        }
-
+        this.countMinSketch = countMinSketch;
+        this.size = 0;
         this.phi = phi;
         this.topK = new HashMap<Object,Long>();
     }
 
-    @Override
-    public void add(long item, long count) {
-        super.add(item,count);
+    public void addLong(long item, long count) {
+        countMinSketch.add(item,count);
+        size+=count;
+        updateTopK(item);
+    }
+
+    public void addString(String item, long count) {
+        countMinSketch.add(item,count);
         size+=count;
         updateTopK(item);
     }
 
     @Override
-    public void add(String item, long count) {
-        super.add(item,count);
-        size+=count;
-        updateTopK(item);
+    public void addObject(Object o) {
+        long objectHash = MurmurHash.hash(o);
+        countMinSketch.add(objectHash, 1);
+        size+=1;
+        updateTopK(objectHash);
     }
 
     private void updateTopK(long item){
         long minFrequency = (long)Math.ceil(size*phi);
-        long estimateCount = estimateCount(item);
+        long estimateCount = countMinSketch.estimateCount(item);
         if (estimateCount >= minFrequency){
             topK.put(item,estimateCount);
         }
@@ -81,7 +56,7 @@ public class CountMinTopK extends CountMinSketch {
 
     private void updateTopK(String item){
         long minFrequency = (long)Math.ceil(size*phi);
-        long estimateCount = estimateCount(item);
+        long estimateCount = countMinSketch.estimateCount(item);
         if (estimateCount >= minFrequency){
             topK.put(item,estimateCount);
         }
@@ -100,16 +75,27 @@ public class CountMinTopK extends CountMinSketch {
         }
     }
 
-    public static CountMinTopK merge(CountMinTopK... estimators) throws CMSMergeException {
-        CountMinSketch mergedSketch = (CountMinSketch) CountMinSketch.merge(estimators);
+    public static CountMinTopK merge(CountMinTopK... estimators) throws CMTopKMergeException {
+        CountMinSketch[] countMinSketches = new CountMinSketch[estimators.length];
+        CountMinSketch mergedSketch;
+
+        for (int i=0;i<estimators.length;i++){
+            countMinSketches[i] = estimators[i].countMinSketch;
+        }
+        try {
+            mergedSketch = CountMinSketch.merge(countMinSketches);
+        }catch (Exception ex){
+            throw new CMTopKMergeException("Cannot merge count min sketches: "+ex.getMessage());
+        }
+
         double phi = estimators[0].phi;
         Map<Object,Long> topK = new HashMap<Object,Long>();
-        CountMinTopK merged = new CountMinTopK(mergedSketch,phi);
+        CountMinTopK mergedTopK = new CountMinTopK(mergedSketch,phi);
 
         if (estimators != null && estimators.length > 0) {
             for (CountMinTopK estimator : estimators) {
                 if (estimator.phi != phi) {
-                    throw new CMSMergeException("Cannot merge estimators of frequency expectation");
+                    throw new CMTopKMergeException("Frequency expectation cannot be merged");
                 }
                 for (Map.Entry<Object, Long> entry : estimator.topK.entrySet()) {
                     if (topK.containsKey(entry.getKey())){
@@ -120,9 +106,28 @@ public class CountMinTopK extends CountMinSketch {
                 }
             }
         }
-        long minFrequency = (long) Math.ceil(merged.size * estimators[0].phi);
-        merged.topK = new HashMap<Object,Long>(topK);
-        merged.removeNonFrequent(minFrequency);
-        return merged;
+        long minFrequency = (long) Math.ceil(mergedTopK.size * estimators[0].phi);
+        mergedTopK.topK = new HashMap<Object,Long>(topK);
+        mergedTopK.removeNonFrequent(minFrequency);
+        return mergedTopK;
     }
+
+
+    @Override
+    public HashMap getTopK() {
+        return topK;
+    }
+
+    @Override
+    public long getTotalCardinality() {
+        return size;
+    }
+
+
+    protected static class CMTopKMergeException extends TopKMergeException {
+        public CMTopKMergeException(String message) {
+            super(message);
+        }
+    }
+
 }
