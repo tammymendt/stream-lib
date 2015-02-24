@@ -1,4 +1,6 @@
-package com.clearspring.analytics.stream.frequency;
+package com.clearspring.analytics.stream.topK;
+
+import com.clearspring.analytics.stream.frequency.CountMinSketch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -8,7 +10,7 @@ import java.util.Map;
 /**
  * Created by Tamara on 2/18/2015.
  */
-public class CountMinTopK extends CountMinSketch{
+public class CountMinTopK extends CountMinSketch {
 
     Map<Object,Long> topK;
     double phi;
