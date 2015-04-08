@@ -12,7 +12,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * Created by Tamara on 2/18/2015.
  */
-public class CountMinTopKTest {
+public class CountMinHeavyHitterTest {
 
     @Test
     public void testAccuracy() {
@@ -62,7 +62,7 @@ public class CountMinTopKTest {
     }
 
     @Test
-    public void merge() throws CountMinHeavyHitter.CMTopKMergeException {
+    public void merge() throws CountMinHeavyHitter.CMHeavyHitterMergeException {
         int numToMerge = 5;
         int cardinality = 1000000;
 
