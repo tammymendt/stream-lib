@@ -1,15 +1,15 @@
-package com.clearspring.analytics.stream.topK;
+package com.clearspring.analytics.stream.heavyhitters;
 
 import java.util.HashMap;
 
 /**
  * Created by tamara on 23.02.15.
  */
-public interface TopK {
+public interface IHeavyHitter {
 
     void addObject(Object o);
 
-    HashMap getTopK();
+    HashMap getHeavyHitters();
 
     long getTotalCardinality();
 }

@@ -1,7 +1,6 @@
-package com.clearspring.analytics.stream.topK;
+package com.clearspring.analytics.stream.heavyhitters;
 
 import com.clearspring.analytics.stream.frequency.CountMinSketch;
-import com.clearspring.analytics.stream.topK.CountMinTopK;
 import org.junit.Test;
 
 import java.util.Map;
@@ -42,7 +41,7 @@ public class CountMinTopKTest {
         double confidence = 0.99;
 
         CountMinSketch sketch = new CountMinSketch(epsOfTotalCount, confidence, seed);
-        CountMinTopK cmTopK = new CountMinTopK(sketch,phi);
+        CountMinHeavyHitter cmTopK = new CountMinHeavyHitter(sketch,phi);
 
         for (int x : xs) {
             cmTopK.addLong(x, 1);
@@ -55,15 +54,15 @@ public class CountMinTopKTest {
 
         for (int i = 0; i < actualFreq.length; ++i) {
             if (actualFreq[i]>=frequency){
-                assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], cmTopK.topK.containsKey((long)i));
+                assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], cmTopK.heavyHitters.containsKey((long)i));
             }else{
-                assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !cmTopK.topK.containsKey((long)i));
+                assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !cmTopK.heavyHitters.containsKey((long)i));
             }
         }
     }
 
     @Test
-    public void merge() throws CountMinTopK.CMTopKMergeException {
+    public void merge() throws CountMinHeavyHitter.CMTopKMergeException {
         int numToMerge = 5;
         int cardinality = 1000000;
 
@@ -77,12 +76,12 @@ public class CountMinTopKTest {
         Random r = new Random();
 
         CountMinSketch sketchBaseline = new CountMinSketch(epsOfTotalCount, confidence, seed);
-        CountMinTopK baseline = new CountMinTopK(sketchBaseline,phi);
+        CountMinHeavyHitter baseline = new CountMinHeavyHitter(sketchBaseline,phi);
 
-        CountMinTopK[] sketches = new CountMinTopK[numToMerge];
+        CountMinHeavyHitter[] sketches = new CountMinHeavyHitter[numToMerge];
         for (int i = 0; i < numToMerge; i++) {
             CountMinSketch cms = new CountMinSketch(epsOfTotalCount, confidence, seed);
-            sketches[i] = new CountMinTopK(cms, phi);
+            sketches[i] = new CountMinHeavyHitter(cms, phi);
             for (int j = 0; j < cardinality; j++) {
                 double p = r.nextDouble();
                 if (p<0.2){
@@ -100,11 +99,11 @@ public class CountMinTopKTest {
             }
         }
 
-        CountMinTopK merged = CountMinTopK.merge(sketches);
+        CountMinHeavyHitter merged = CountMinHeavyHitter.merge(sketches);
 
-        for (Map.Entry<Object, Long> entry : baseline.topK.entrySet()){
-            assertTrue("Frequent item in baseline is not frequent in merged: " + entry.getKey(), merged.topK.containsKey(entry.getKey()));
-            assertEquals(entry.getValue(), merged.topK.get(entry.getKey()));
+        for (Map.Entry<Object, Long> entry : baseline.heavyHitters.entrySet()){
+            assertTrue("Frequent item in baseline is not frequent in merged: " + entry.getKey(), merged.heavyHitters.containsKey(entry.getKey()));
+            assertEquals(entry.getValue(), merged.heavyHitters.get(entry.getKey()));
         }
     }
 

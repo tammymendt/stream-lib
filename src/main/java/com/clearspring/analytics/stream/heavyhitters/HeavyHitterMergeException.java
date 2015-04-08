@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.clearspring.analytics.stream.topK;
+package com.clearspring.analytics.stream.heavyhitters;
 
 /**
  * Created by tamara on 24.02.15.
  */
-public class TopKMergeException extends Exception {
+public class HeavyHitterMergeException extends Exception {
 
-    public TopKMergeException(String message) {
+    public HeavyHitterMergeException(String message) {
         super(message);
     }
 }
