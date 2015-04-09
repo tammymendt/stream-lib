@@ -17,6 +17,7 @@ public class LossyCounting implements IHeavyHitter{
     int cardinality;
     Map<Object,Counter> heavyHitters;
     int delta;
+    int updateCounter;
 
     private class Counter{
         long lowerBound;
@@ -45,6 +46,7 @@ public class LossyCounting implements IHeavyHitter{
         this.cardinality = 0;
         this.heavyHitters = new HashMap<Object, Counter>();
         this.delta = 0;
+        this.updateCounter = (int)Math.ceil(1/error);
     }
 
     @Override
@@ -55,10 +57,12 @@ public class LossyCounting implements IHeavyHitter{
             heavyHitters.put(o,new Counter(1,delta));
         }
         cardinality+=1;
-        if ((int)Math.floor(cardinality*fraction)!=delta){
-            delta+=1;
-            //decreaseLowerBound();
+        delta = (int)Math.floor(cardinality*fraction);
+        updateCounter-=1;
+        if (updateCounter==0){
+            decreaseLowerBound();
             updateHeavyHitters();
+            updateCounter = (int)Math.ceil(1/error);
         }
     }
 
@@ -81,17 +85,17 @@ public class LossyCounting implements IHeavyHitter{
     }
 
     public void merge(LossyCounting toMerge) throws HeavyHitterMergeException {
-        if (this.error!=toMerge.error || this.confidence!=toMerge.confidence || this.fraction!=toMerge.fraction){
+        if (this.fraction!=toMerge.fraction){
             throw new HeavyHitterMergeException("Both heavy hitter structures must be identical");
         }
         this.cardinality+=toMerge.cardinality;
+        this.delta = (int)Math.floor(cardinality*fraction);
         for (Map.Entry<Object, Counter> entry : toMerge.heavyHitters.entrySet()){
             Counter counter = this.heavyHitters.get(entry.getKey());
             if (counter==null){
                 this.heavyHitters.put(entry.getKey(),entry.getValue());
             }else{
                 Counter mergingCounter = entry.getValue();
-                //todo can deltas be merged like this?
                 this.heavyHitters.put(entry.getKey(),
                         new Counter(mergingCounter.lowerBound+counter.lowerBound,mergingCounter.counterDelta +counter.counterDelta));
             }
@@ -111,5 +115,14 @@ public class LossyCounting implements IHeavyHitter{
     @Override
     public long getTotalCardinality() {
         return cardinality;
+    }
+
+    @Override
+    public String toString(){
+        String out = "";
+        for (Map.Entry<Object, Counter> entry : heavyHitters.entrySet()){
+            out+=entry.getKey().toString()+": "+entry.getValue().lowerBound+" "+entry.getValue().counterDelta+"\n";
+        }
+        return out;
     }
 }
