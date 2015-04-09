@@ -9,11 +9,8 @@ import java.util.Map;
  */
 public class LossyCounting implements IHeavyHitter{
 
-    final int PERIOD = 100;
-
     double fraction;
     double error;
-    double confidence;
     int cardinality;
     Map<Object,Counter> heavyHitters;
     int delta;
@@ -38,11 +35,10 @@ public class LossyCounting implements IHeavyHitter{
 
     }
 
-    public LossyCounting(double fraction, double error, double confidence){
+    public LossyCounting(double fraction, double error){
 
         this.fraction = fraction;
         this.error = error;
-        this.confidence = confidence;
         this.cardinality = 0;
         this.heavyHitters = new HashMap<Object, Counter>();
         this.delta = 0;

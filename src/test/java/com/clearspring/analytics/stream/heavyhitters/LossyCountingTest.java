@@ -36,7 +36,7 @@ public class LossyCountingTest {
             }
         }
 
-        LossyCounting lossyCounting = new LossyCounting(fraction,error,confidence);
+        LossyCounting lossyCounting = new LossyCounting(fraction,error);
 
         for (int x : xs) {
             lossyCounting.addObject(x);
@@ -66,13 +66,13 @@ public class LossyCountingTest {
         int cardinality = 10000;
         int maxScale = 20;
 
-        LossyCounting baseline = new LossyCounting(fraction,error,confidence);
+        LossyCounting baseline = new LossyCounting(fraction,error);
 
-        LossyCounting merged = new LossyCounting(fraction,error,confidence);
+        LossyCounting merged = new LossyCounting(fraction,error);
 
         LossyCounting[] sketches = new LossyCounting[numToMerge];
         for (int i = 0; i < numToMerge; i++) {
-            sketches[i] = new LossyCounting(fraction,error/2,confidence);
+            sketches[i] = new LossyCounting(fraction,error/2);
             for (int j = 0; j < cardinality; j++) {
                 double p = r.nextDouble();
                 if (p<0.2){
