@@ -76,7 +76,7 @@ public class LossyCounting implements IHeavyHitter{
                 throw new HeavyHitterMergeException("Both heavy hitter structures must be identical");
             }
             this.cardinality+=lsToMerge.cardinality;
-            this.bucket = (int)Math.floor(cardinality*fraction);
+            this.bucket = (int)Math.floor(cardinality*error);
             for (Map.Entry<Object, Counter> entry : lsToMerge.heavyHitters.entrySet()){
                 Counter counter = this.heavyHitters.get(entry.getKey());
                 if (counter==null){
@@ -84,7 +84,7 @@ public class LossyCounting implements IHeavyHitter{
                 }else{
                     Counter mergingCounter = entry.getValue();
                     this.heavyHitters.put(entry.getKey(),
-                            new Counter(mergingCounter.lowerBound+counter.lowerBound,mergingCounter.frequencyError +counter.frequencyError));
+                            new Counter(mergingCounter.lowerBound+counter.lowerBound, mergingCounter.frequencyError +counter.frequencyError));
                 }
             }
             updateHeavyHitters();

@@ -68,7 +68,7 @@ public class LossyCountingTest {
         }
     }
 
-/*    @Test
+    @Test
     public void merge() throws HeavyHitterMergeException {
         int numToMerge = 5;
         int cardinality = 10000;
@@ -95,8 +95,6 @@ public class LossyCountingTest {
                 }
             }
             merged.merge(sketches[i]);
-            //System.out.println("\nLossy Count: "+i);
-            //System.out.println(sketches[i].toString());
         }
 
         System.out.println("\nMERGED\n");
@@ -105,10 +103,8 @@ public class LossyCountingTest {
         System.out.println("\nBASELINE\n");
         System.out.println(baseline.toString());
 
-        for (Map.Entry<Object, String> entry : baseline.getHeavyHitters().entrySet()){
+        for (Map.Entry<Object, Long> entry : baseline.getHeavyHitters().entrySet()){
             assertTrue("Frequent item in baseline is not frequent in merged: " + entry.getKey(), merged.heavyHitters.containsKey(entry.getKey()));
-
         }
     }
-*/
 }
