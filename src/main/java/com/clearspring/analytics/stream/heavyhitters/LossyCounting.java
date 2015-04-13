@@ -13,16 +13,15 @@ public class LossyCounting implements IHeavyHitter{
     double error;
     int cardinality;
     Map<Object,Counter> heavyHitters;
-    int delta;
-    int updateCounter;
+    int bucket;
 
     private class Counter{
         long lowerBound;
-        long counterDelta;
+        long frequencyError;
 
-        private Counter(long lowerBound, long counterDelta){
+        private Counter(long lowerBound, long frequencyError){
             this.lowerBound = lowerBound;
-            this.counterDelta = counterDelta;
+            this.frequencyError = frequencyError;
         }
 
         private void updateLowerBound(int count){
@@ -30,7 +29,7 @@ public class LossyCounting implements IHeavyHitter{
         }
 
         private long getUpperBound(){
-            return lowerBound+ counterDelta;
+            return lowerBound + frequencyError;
         }
 
     }
@@ -41,37 +40,27 @@ public class LossyCounting implements IHeavyHitter{
         this.error = error;
         this.cardinality = 0;
         this.heavyHitters = new HashMap<Object, Counter>();
-        this.delta = 0;
-        this.updateCounter = (int)Math.ceil(1/error);
+        this.bucket = 0;
     }
 
     @Override
     public void addObject(Object o) {
+        cardinality+=1;
         if (heavyHitters.containsKey(o)){
             heavyHitters.get(o).updateLowerBound(1);
         }else{
-            heavyHitters.put(o,new Counter(1,delta));
+            heavyHitters.put(o,new Counter(1, bucket));
         }
-        cardinality+=1;
-        delta = (int)Math.floor(cardinality*fraction);
-        updateCounter-=1;
-        if (updateCounter==0){
-            decreaseLowerBound();
+        if (cardinality%(int)Math.ceil(1/error)==0) {
+            bucket += 1;
             updateHeavyHitters();
-            updateCounter = (int)Math.ceil(1/error);
-        }
-    }
-
-    public void decreaseLowerBound(){
-        for (Map.Entry<Object, Counter> entry : heavyHitters.entrySet()) {
-            entry.getValue().updateLowerBound(-1);
         }
     }
 
     public void updateHeavyHitters(){
         ArrayList<Object> nonFrequentKeys = new ArrayList<Object>();
         for (Map.Entry<Object, Counter> entry : heavyHitters.entrySet()){
-            if (entry.getValue().getUpperBound()<delta || entry.getValue().lowerBound==0){
+            if (entry.getValue().getUpperBound()< bucket){
                 nonFrequentKeys.add(entry.getKey());
             }
         }
@@ -87,7 +76,7 @@ public class LossyCounting implements IHeavyHitter{
                 throw new HeavyHitterMergeException("Both heavy hitter structures must be identical");
             }
             this.cardinality+=lsToMerge.cardinality;
-            this.delta = (int)Math.floor(cardinality*fraction);
+            this.bucket = (int)Math.floor(cardinality*fraction);
             for (Map.Entry<Object, Counter> entry : lsToMerge.heavyHitters.entrySet()){
                 Counter counter = this.heavyHitters.get(entry.getKey());
                 if (counter==null){
@@ -95,7 +84,7 @@ public class LossyCounting implements IHeavyHitter{
                 }else{
                     Counter mergingCounter = entry.getValue();
                     this.heavyHitters.put(entry.getKey(),
-                            new Counter(mergingCounter.lowerBound+counter.lowerBound,mergingCounter.counterDelta +counter.counterDelta));
+                            new Counter(mergingCounter.lowerBound+counter.lowerBound,mergingCounter.frequencyError +counter.frequencyError));
                 }
             }
             updateHeavyHitters();
@@ -105,12 +94,15 @@ public class LossyCounting implements IHeavyHitter{
     }
 
     @Override
-    public HashMap<Object,String> getHeavyHitters() {
-        HashMap<Object,String> heavyHitterCounters = new HashMap<Object, String>();
+    public HashMap<Object,Long> getHeavyHitters() {
+        HashMap<Object,Long> heavyHitterLowerBounds = new HashMap<Object, Long>();
+        long minFrequency = (long)Math.ceil(cardinality*(fraction-error));
         for (Map.Entry<Object, Counter> entry : heavyHitters.entrySet()){
-            heavyHitterCounters.put(entry.getKey(), String.valueOf(entry.getValue().lowerBound)+","+String.valueOf(entry.getValue().counterDelta));
+            if(entry.getValue().lowerBound>=minFrequency){
+                heavyHitterLowerBounds.put(entry.getKey(), entry.getValue().lowerBound);
+            }
         }
-        return heavyHitterCounters;
+        return heavyHitterLowerBounds;
     }
 
     @Override
@@ -118,19 +110,14 @@ public class LossyCounting implements IHeavyHitter{
         return cardinality;
     }
 
-    public long getLowerBound(Object o){
-        return heavyHitters.get(o).lowerBound;
-    }
-
-    public long getUpperBound(Object o){
-        return heavyHitters.get(o).getUpperBound();
-    }
-
     @Override
     public String toString(){
         String out = "";
+        long minFrequency = (long)Math.ceil(cardinality*(fraction-error));
         for (Map.Entry<Object, Counter> entry : heavyHitters.entrySet()){
-            out+=entry.getKey().toString()+": "+entry.getValue().lowerBound+" "+entry.getValue().counterDelta+"\n";
+            if(entry.getValue().lowerBound>=minFrequency) {
+                out += entry.getKey().toString() + ": " + entry.getValue().lowerBound + " " + entry.getValue().frequencyError + "\n";
+            }
         }
         return out;
     }
