@@ -14,25 +14,25 @@ public class CountMinHeavyHitter implements IHeavyHitter {
 
     CountMinSketch countMinSketch;
     HashMap<Object,Long> heavyHitters;
-    double phi;
-    long size;
+    double fraction;
+    long cardinality;
 
-    public CountMinHeavyHitter(CountMinSketch countMinSketch, double phi){
+    public CountMinHeavyHitter(CountMinSketch countMinSketch, double fraction){
         this.countMinSketch = countMinSketch;
-        this.size = 0;
-        this.phi = phi;
+        this.cardinality = 0;
+        this.fraction = fraction;
         this.heavyHitters = new HashMap<Object,Long>();
     }
 
     public void addLong(long item, long count) {
         countMinSketch.add(item,count);
-        size+=count;
+        cardinality +=count;
         updateHeavyHitters(item);
     }
 
     public void addString(String item, long count) {
         countMinSketch.add(item,count);
-        size+=count;
+        cardinality +=count;
         updateHeavyHitters(item);
     }
 
@@ -40,12 +40,12 @@ public class CountMinHeavyHitter implements IHeavyHitter {
     public void addObject(Object o) {
         long objectHash = MurmurHash.hash(o);
         countMinSketch.add(objectHash, 1);
-        size+=1;
+        cardinality +=1;
         updateHeavyHitters(objectHash);
     }
 
     private void updateHeavyHitters(long item){
-        long minFrequency = (long)Math.ceil(size*phi);
+        long minFrequency = (long)Math.ceil(cardinality * fraction);
         long estimateCount = countMinSketch.estimateCount(item);
         if (estimateCount >= minFrequency){
             heavyHitters.put(item, estimateCount);
@@ -54,7 +54,7 @@ public class CountMinHeavyHitter implements IHeavyHitter {
     }
 
     private void updateHeavyHitters(String item){
-        long minFrequency = (long)Math.ceil(size*phi);
+        long minFrequency = (long)Math.ceil(cardinality * fraction);
         long estimateCount = countMinSketch.estimateCount(item);
         if (estimateCount >= minFrequency){
             heavyHitters.put(item, estimateCount);
@@ -74,41 +74,33 @@ public class CountMinHeavyHitter implements IHeavyHitter {
         }
     }
 
-    public static CountMinHeavyHitter merge(CountMinHeavyHitter... estimators) throws CMHeavyHitterMergeException {
-        CountMinSketch[] countMinSketches = new CountMinSketch[estimators.length];
-        CountMinSketch mergedSketch;
+    public void merge(IHeavyHitter toMerge) throws CMHeavyHitterMergeException {
 
-        for (int i=0;i<estimators.length;i++){
-            countMinSketches[i] = estimators[i].countMinSketch;
-        }
         try {
-            mergedSketch = CountMinSketch.merge(countMinSketches);
+            CountMinHeavyHitter cmToMerge = (CountMinHeavyHitter)toMerge;
+            this.countMinSketch = CountMinSketch.merge(this.countMinSketch, cmToMerge.countMinSketch);
+
+            if (this.fraction != cmToMerge.fraction) {
+                throw new CMHeavyHitterMergeException("Frequency expectation cannot be merged");
+            }
+
+            for (Map.Entry<Object, Long> entry : cmToMerge.heavyHitters.entrySet()) {
+                if (this.heavyHitters.containsKey(entry.getKey())){
+                    this.heavyHitters.put(entry.getKey(),this.countMinSketch.estimateCount((Long)entry.getKey()));
+                }else{
+                    this.heavyHitters.put(entry.getKey(),entry.getValue());
+                }
+            }
+
+            cardinality+=cmToMerge.cardinality;
+            long minFrequency = (long) Math.ceil(cardinality * fraction);
+            this.removeNonFrequent(minFrequency);
+
+        }catch (ClassCastException ex){
+            throw new CMHeavyHitterMergeException("Both heavy hitter objects must belong to the same class");
         }catch (Exception ex){
             throw new CMHeavyHitterMergeException("Cannot merge count min sketches: "+ex.getMessage());
         }
-
-        double phi = estimators[0].phi;
-        Map<Object,Long> topK = new HashMap<Object,Long>();
-        CountMinHeavyHitter mergedTopK = new CountMinHeavyHitter(mergedSketch,phi);
-
-        if (estimators != null && estimators.length > 0) {
-            for (CountMinHeavyHitter estimator : estimators) {
-                if (estimator.phi != phi) {
-                    throw new CMHeavyHitterMergeException("Frequency expectation cannot be merged");
-                }
-                for (Map.Entry<Object, Long> entry : estimator.heavyHitters.entrySet()) {
-                    if (topK.containsKey(entry.getKey())){
-                        topK.put(entry.getKey(),mergedSketch.estimateCount((long)entry.getKey()));
-                    }else{
-                        topK.put(entry.getKey(),entry.getValue());
-                    }
-                }
-            }
-        }
-        long minFrequency = (long) Math.ceil(mergedTopK.size * estimators[0].phi);
-        mergedTopK.heavyHitters = new HashMap<Object,Long>(topK);
-        mergedTopK.removeNonFrequent(minFrequency);
-        return mergedTopK;
     }
 
 
@@ -119,7 +111,7 @@ public class CountMinHeavyHitter implements IHeavyHitter {
 
     @Override
     public long getTotalCardinality() {
-        return size;
+        return cardinality;
     }
 
 

@@ -12,4 +12,7 @@ public interface IHeavyHitter {
     HashMap getHeavyHitters();
 
     long getTotalCardinality();
+
+    void merge(IHeavyHitter toMerge) throws HeavyHitterMergeException;
+
 }

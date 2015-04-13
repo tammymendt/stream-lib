@@ -1,10 +1,11 @@
 package com.clearspring.analytics.stream.heavyhitters;
 
 import org.junit.Test;
-import static org.junit.Assert.assertTrue;
 
 import java.util.Map;
 import java.util.Random;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by tamara on 08.04.15.
@@ -54,6 +55,9 @@ public class LossyCountingTest {
         for (int i = 0; i < actualFreq.length; ++i) {
             if (actualFreq[i]>=frequency){
                 assertTrue("Frequent item not found: item " + i + ", frequency " + actualFreq[i], lossyCounting.heavyHitters.containsKey(i));
+                assertTrue("Estimate bounds are not correct: "+ i +" actual-> "+ actualFreq[i]+" bounds: ["+
+                        lossyCounting.getLowerBound(i)+","+lossyCounting.getUpperBound(i)+"]",
+                        lossyCounting.getLowerBound(i)>actualFreq[i] || actualFreq[i]>lossyCounting.getUpperBound(i));
             }else{
                 assertTrue("False Positive: " + i + ", frequency " + actualFreq[i] + " (min expected frequency "+frequency+")", !lossyCounting.heavyHitters.containsKey(i));
             }
@@ -91,14 +95,15 @@ public class LossyCountingTest {
             //System.out.println(sketches[i].toString());
         }
 
-/*        System.out.println("\nMERGED\n");
+        System.out.println("\nMERGED\n");
         System.out.println(merged.toString());
 
         System.out.println("\nBASELINE\n");
         System.out.println(baseline.toString());
-*/
+
         for (Map.Entry<Object, String> entry : baseline.getHeavyHitters().entrySet()){
             assertTrue("Frequent item in baseline is not frequent in merged: " + entry.getKey(), merged.heavyHitters.containsKey(entry.getKey()));
+
         }
     }
 

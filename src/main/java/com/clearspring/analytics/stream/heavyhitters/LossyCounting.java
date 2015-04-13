@@ -80,28 +80,33 @@ public class LossyCounting implements IHeavyHitter{
         }
     }
 
-    public void merge(LossyCounting toMerge) throws HeavyHitterMergeException {
-        if (this.fraction!=toMerge.fraction){
+    public void merge(IHeavyHitter toMerge) throws HeavyHitterMergeException {
+        try{
+            LossyCounting lsToMerge = (LossyCounting)toMerge;
+            if (this.fraction!=lsToMerge.fraction){
+                throw new HeavyHitterMergeException("Both heavy hitter structures must be identical");
+            }
+            this.cardinality+=lsToMerge.cardinality;
+            this.delta = (int)Math.floor(cardinality*fraction);
+            for (Map.Entry<Object, Counter> entry : lsToMerge.heavyHitters.entrySet()){
+                Counter counter = this.heavyHitters.get(entry.getKey());
+                if (counter==null){
+                    this.heavyHitters.put(entry.getKey(),entry.getValue());
+                }else{
+                    Counter mergingCounter = entry.getValue();
+                    this.heavyHitters.put(entry.getKey(),
+                            new Counter(mergingCounter.lowerBound+counter.lowerBound,mergingCounter.counterDelta +counter.counterDelta));
+                }
+            }
+            updateHeavyHitters();
+        }catch (ClassCastException ex){
             throw new HeavyHitterMergeException("Both heavy hitter structures must be identical");
         }
-        this.cardinality+=toMerge.cardinality;
-        this.delta = (int)Math.floor(cardinality*fraction);
-        for (Map.Entry<Object, Counter> entry : toMerge.heavyHitters.entrySet()){
-            Counter counter = this.heavyHitters.get(entry.getKey());
-            if (counter==null){
-                this.heavyHitters.put(entry.getKey(),entry.getValue());
-            }else{
-                Counter mergingCounter = entry.getValue();
-                this.heavyHitters.put(entry.getKey(),
-                        new Counter(mergingCounter.lowerBound+counter.lowerBound,mergingCounter.counterDelta +counter.counterDelta));
-            }
-        }
-        updateHeavyHitters();
     }
 
     @Override
     public HashMap<Object,String> getHeavyHitters() {
-        HashMap<Object,String> heavyHitterCounters = new HashMap<>();
+        HashMap<Object,String> heavyHitterCounters = new HashMap<Object, String>();
         for (Map.Entry<Object, Counter> entry : heavyHitters.entrySet()){
             heavyHitterCounters.put(entry.getKey(), String.valueOf(entry.getValue().lowerBound)+","+String.valueOf(entry.getValue().counterDelta));
         }
@@ -111,6 +116,14 @@ public class LossyCounting implements IHeavyHitter{
     @Override
     public long getTotalCardinality() {
         return cardinality;
+    }
+
+    public long getLowerBound(Object o){
+        return heavyHitters.get(o).lowerBound;
+    }
+
+    public long getUpperBound(Object o){
+        return heavyHitters.get(o).getUpperBound();
     }
 
     @Override

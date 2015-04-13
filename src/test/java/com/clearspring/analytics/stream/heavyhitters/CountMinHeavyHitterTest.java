@@ -6,8 +6,8 @@ import org.junit.Test;
 import java.util.Map;
 import java.util.Random;
 
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by Tamara on 2/18/2015.
@@ -19,8 +19,8 @@ public class CountMinHeavyHitterTest {
         int seed = 7364181;
         Random r = new Random(seed);
         int numItems = 1000000;
-        double phi = 0.2;
-        long frequency = (int)Math.ceil(numItems*phi);
+        double fraction = 0.2;
+        long frequency = (int)Math.ceil(numItems*fraction);
 
         int[] xs = new int[numItems];
         int maxScale = 20;
@@ -41,7 +41,7 @@ public class CountMinHeavyHitterTest {
         double confidence = 0.99;
 
         CountMinSketch sketch = new CountMinSketch(epsOfTotalCount, confidence, seed);
-        CountMinHeavyHitter cmTopK = new CountMinHeavyHitter(sketch,phi);
+        CountMinHeavyHitter cmTopK = new CountMinHeavyHitter(sketch,fraction);
 
         for (int x : xs) {
             cmTopK.addLong(x, 1);
@@ -70,18 +70,19 @@ public class CountMinHeavyHitterTest {
 
         double confidence = 0.99;
         int seed = 7364181;
-        double phi = 0.2;
+        double fraction = 0.2;
 
         int maxScale = 20;
         Random r = new Random();
 
         CountMinSketch sketchBaseline = new CountMinSketch(epsOfTotalCount, confidence, seed);
-        CountMinHeavyHitter baseline = new CountMinHeavyHitter(sketchBaseline,phi);
+        CountMinHeavyHitter baseline = new CountMinHeavyHitter(sketchBaseline,fraction);
+        CountMinHeavyHitter merged = null;
 
         CountMinHeavyHitter[] sketches = new CountMinHeavyHitter[numToMerge];
         for (int i = 0; i < numToMerge; i++) {
             CountMinSketch cms = new CountMinSketch(epsOfTotalCount, confidence, seed);
-            sketches[i] = new CountMinHeavyHitter(cms, phi);
+            sketches[i] = new CountMinHeavyHitter(cms, fraction);
             for (int j = 0; j < cardinality; j++) {
                 double p = r.nextDouble();
                 if (p<0.2){
@@ -97,9 +98,12 @@ public class CountMinHeavyHitterTest {
                     baseline.addLong(val, 1);
                 }
             }
+            if (i==0){
+                merged = sketches[0];
+            }else{
+                merged.merge(sketches[i]);
+            }
         }
-
-        CountMinHeavyHitter merged = CountMinHeavyHitter.merge(sketches);
 
         for (Map.Entry<Object, Long> entry : baseline.heavyHitters.entrySet()){
             assertTrue("Frequent item in baseline is not frequent in merged: " + entry.getKey(), merged.heavyHitters.containsKey(entry.getKey()));
